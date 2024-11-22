@@ -43,12 +43,14 @@ def _parser() -> argparse.ArgumentParser:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description="""For a given update, search inside the Single Incidents - Core Incidents and Aggregated updates
         job groups for openQA builds related to the update.  It searches by default within the last 5 days in the
-        "Aggregated updates" section."""
+        "Aggregated updates" section.""",
     )
     parser.add_argument(
         "update_id", type=str, help="Update ID, format SUSE:Maintenance:xxxxx:xxxxxx or S:M:xxxxx:xxxxxx"
     )
-    parser.add_argument("--url-dashboard-qam", type=str, default="http://dashboard.qam.suse.de", help="QAM dashboard URL")
+    parser.add_argument(
+        "--url-dashboard-qam", type=str, default="http://dashboard.qam.suse.de", help="QAM dashboard URL"
+    )
     parser.add_argument("--url-openqa", type=str, default="https://openqa.suse.de", help="OpenQA URL")
     parser.add_argument("--url-qam", type=str, default="https://qam.suse.de", help="QAM URL")
     parser.add_argument(
@@ -112,7 +114,7 @@ def _get_json(url: str) -> List[Dict]:
     :param url: url to fetch json from
     :return: json data
     """
-    response = requests.get(url)#, verify=False)
+    response = requests.get(url)  # , verify=False)
     response.raise_for_status()
 
     return response.json()
@@ -125,7 +127,7 @@ def _get_log_text(url: str) -> str:
     :param url: url to fetch log text from
     :return: log text
     """
-    response = requests.get(url)#, verify=False)
+    response = requests.get(url)  # , verify=False)
     response.raise_for_status()
 
     return response.text
@@ -323,7 +325,9 @@ def aggregated_updates(
                     # no build for this date yet
                     continue
             else:
-                print_warn("{} -> No aggregated updates build for this incident in the last {} days".format(version, days))
+                print_warn(
+                    "{} -> No aggregated updates build for this incident in the last {} days".format(version, days)
+                )
 
 
 def build_checks(incident_id: str, request_id: str, build: str, url_qam: str) -> None:
