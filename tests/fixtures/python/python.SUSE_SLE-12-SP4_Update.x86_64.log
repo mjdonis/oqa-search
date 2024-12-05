@@ -1,0 +1,105 @@
+[   96s] Executing(%check): /bin/sh -e /var/tmp/rpm-tmp.03zmvY
+[   96s] + umask 022
+[   96s] + cd /home/abuild/rpmbuild/BUILD
+[   96s] + cd Python-2.7.18
+[   96s] ++ ulimit -v
+[   96s] + test unlimited = unlimited
+[   96s] + ulimit -v 10000000
+[   96s] + LIST='test_urllib test_ssl test_hashlib test_hmac test_unicodedata test_tarfile test_sqlite test_tcl test_dbm test_anydbm test_dumbdbm test_gdbm test_whichdb test_tk test_ttk_textonly test_bsddb test_bsddb3 test_readline'
+[   96s] + make test 'TESTOPTS=-w test_urllib test_ssl test_hashlib test_hmac test_unicodedata test_tarfile test_sqlite test_tcl test_dbm test_anydbm test_dumbdbm test_gdbm test_whichdb test_tk test_ttk_textonly test_bsddb test_bsddb3 test_readline' TESTPYTHONOPTS=-R
+[   96s] running build
+[   96s] running build_ext
+[   97s] building dbm using ndbm
+[   97s] 
+[   97s] Python build finished, but the necessary bits to build these modules were not found:
+[   97s] bsddb185           dl                 imageop         
+[   97s] sunaudiodev                                           
+[   97s] To find the necessary bits, look in setup.py in detect_modules() for the module's name.
+[   97s] 
+[   97s] running build_scripts
+[   97s] LD_LIBRARY_PATH=/home/abuild/rpmbuild/BUILD/Python-2.7.18 ./python -E -c 'import sys ; from sysconfig import get_platform ; print get_platform()+"-"+sys.version[0:3]' >platform
+[   97s] find ./Lib -name '*.py[co]' -print | xargs rm -f
+[   97s] LD_LIBRARY_PATH=/home/abuild/rpmbuild/BUILD/Python-2.7.18 ./python -Wd -3 -E -tt -R ./Lib/test/regrtest.py -w test_urllib test_ssl test_hashlib test_hmac test_unicodedata test_tarfile test_sqlite test_tcl test_dbm test_anydbm test_dumbdbm test_gdbm test_whichdb test_tk test_ttk_textonly test_bsddb test_bsddb3 test_readline
+[   97s] Run tests sequentially
+[   97s] 0:00:00 load avg: 0.93 [ 1/18] test_urllib
+[   97s] /home/abuild/rpmbuild/BUILD/Python-2.7.18/Lib/ipaddress.py:82: DeprecationWarning: Overriding __eq__ blocks inheritance of __hash__ in 3.x
+[   97s]   class _TotalOrderingMixin(object):
+[   97s] 0:00:00 load avg: 0.93 [ 2/18] test_ssl
+[   98s] 0:00:01 load avg: 0.93 [ 3/18] test_hashlib
+[   98s] 0:00:01 load avg: 0.93 [ 4/18] test_hmac
+[   98s] 0:00:01 load avg: 0.93 [ 5/18] test_unicodedata
+[   99s] 0:00:02 load avg: 0.93 [ 6/18] test_tarfile
+[  100s] 0:00:03 load avg: 0.93 [ 7/18] test_sqlite
+[  100s] 0:00:03 load avg: 0.93 [ 8/18] test_tcl
+[  100s] 0:00:03 load avg: 0.93 [ 9/18] test_dbm
+[  100s] 0:00:03 load avg: 0.93 [10/18] test_anydbm
+[  100s] 0:00:03 load avg: 0.93 [11/18] test_dumbdbm
+[  100s] 0:00:03 load avg: 0.93 [12/18] test_gdbm
+[  100s] 0:00:03 load avg: 0.93 [13/18] test_whichdb
+[  100s] 0:00:03 load avg: 0.93 [14/18] test_tk
+[  100s] test_tk skipped -- Use of the `gui' resource not enabled
+[  100s] 0:00:03 load avg: 0.93 [15/18] test_ttk_textonly -- test_tk skipped (resource denied)
+[  100s] 0:00:03 load avg: 0.93 [16/18] test_bsddb
+[  100s] 0:00:03 load avg: 0.93 [17/18] test_bsddb3
+[  100s] test_bsddb3 skipped -- Use of the `bsddb' resource not enabled
+[  100s] 0:00:03 load avg: 0.93 [18/18] test_readline -- test_bsddb3 skipped (resource denied)
+[  100s] 
+[  100s] == Tests result: SUCCESS ==
+[  100s] 
+[  100s] 16 tests OK.
+[  100s] 
+[  100s] 2 tests skipped:
+[  100s]     test_bsddb3 test_tk
+[  100s] Those skips are all expected on linux2.
+[  100s] 
+[  100s] Total duration: 3 sec 790 ms
+[  100s] Tests result: SUCCESS
+[  100s] LD_LIBRARY_PATH=/home/abuild/rpmbuild/BUILD/Python-2.7.18 ./python -Wd -3 -E -tt -R ./Lib/test/regrtest.py -w test_urllib test_ssl test_hashlib test_hmac test_unicodedata test_tarfile test_sqlite test_tcl test_dbm test_anydbm test_dumbdbm test_gdbm test_whichdb test_tk test_ttk_textonly test_bsddb test_bsddb3 test_readline
+[  101s] Run tests sequentially
+[  101s] 0:00:00 load avg: 0.93 [ 1/18] test_urllib
+[  101s] /home/abuild/rpmbuild/BUILD/Python-2.7.18/Lib/ipaddress.py:82: DeprecationWarning: Overriding __eq__ blocks inheritance of __hash__ in 3.x
+[  101s]   class _TotalOrderingMixin(object):
+[  101s] 0:00:00 load avg: 0.93 [ 2/18] test_ssl
+[  102s] 0:00:01 load avg: 0.94 [ 3/18] test_hashlib
+[  102s] 0:00:01 load avg: 0.94 [ 4/18] test_hmac
+[  102s] 0:00:01 load avg: 0.94 [ 5/18] test_unicodedata
+[  103s] 0:00:02 load avg: 0.94 [ 6/18] test_tarfile
+[  104s] 0:00:03 load avg: 0.94 [ 7/18] test_sqlite
+[  104s] 0:00:03 load avg: 0.94 [ 8/18] test_tcl
+[  104s] 0:00:03 load avg: 0.94 [ 9/18] test_dbm
+[  104s] 0:00:03 load avg: 0.94 [10/18] test_anydbm
+[  104s] 0:00:03 load avg: 0.94 [11/18] test_dumbdbm
+[  104s] 0:00:03 load avg: 0.94 [12/18] test_gdbm
+[  104s] 0:00:03 load avg: 0.94 [13/18] test_whichdb
+[  104s] 0:00:03 load avg: 0.94 [14/18] test_tk
+[  104s] test_tk skipped -- Use of the `gui' resource not enabled
+[  104s] 0:00:03 load avg: 0.94 [15/18] test_ttk_textonly -- test_tk skipped (resource denied)
+[  104s] 0:00:03 load avg: 0.94 [16/18] test_bsddb
+[  104s] 0:00:03 load avg: 0.94 [17/18] test_bsddb3
+[  104s] test_bsddb3 skipped -- Use of the `bsddb' resource not enabled
+[  104s] 0:00:03 load avg: 0.94 [18/18] test_readline -- test_bsddb3 skipped (resource denied)
+[  104s] 
+[  104s] == Tests result: SUCCESS ==
+[  104s] 
+[  104s] 16 tests OK.
+[  104s] 
+[  104s] 2 tests skipped:
+[  104s]     test_bsddb3 test_tk
+[  104s] Those skips are all expected on linux2.
+[  104s] 
+[  104s] Total duration: 3 sec 543 ms
+[  104s] Tests result: SUCCESS
+[  104s] + exit 0
+[  104s] Processing files: python-2.7.18-33.38.1.x86_64
+[  105s] Provides: _bsddb.so()(64bit) _hashlib.so()(64bit) _sqlite3.so()(64bit) _ssl.so()(64bit) python = 2.7 python = 2.7.18-33.38.1 python(x86-64) = 2.7.18-33.38.1 python2 = 2.7.18 python2_split_startup readline.so()(64bit)
+[  105s] Requires(interp): /sbin/ldconfig /sbin/ldconfig
+[  105s] Requires(rpmlib): rpmlib(CompressedFileNames) <= 3.0.4-1 rpmlib(PartialHardlinkSets) <= 4.0.4-1 rpmlib(PayloadFilesHavePrefix) <= 4.0-1
+[  105s] Requires(post): /sbin/ldconfig
+[  105s] Requires(postun): /sbin/ldconfig
+[  105s] Requires: libc.so.6()(64bit) libc.so.6(GLIBC_2.14)(64bit) libc.so.6(GLIBC_2.15)(64bit) libc.so.6(GLIBC_2.2.5)(64bit) libc.so.6(GLIBC_2.3.4)(64bit) libc.so.6(GLIBC_2.4)(64bit) libcrypto.so.1.0.0()(64bit) libcrypto.so.1.0.0(OPENSSL_1.0.0)(64bit) libdb-4.8.so()(64bit) libpthread.so.0()(64bit) libpthread.so.0(GLIBC_2.2.5)(64bit) libpython2.7.so.1.0()(64bit) libreadline.so.6()(64bit) libsqlite3.so.0()(64bit) libssl.so.1.0.0()(64bit) libssl.so.1.0.0(OPENSSL_1.0.0)(64bit) python(abi) = 2.7
+[  105s] Obsoletes: python-elementtree python-nothreads python-sqlite python21
+[  105s] Processing files: python-debugsource-2.7.18-33.38.1.x86_64
+[  105s] Provides: python-debugsource = 2.7.18-33.38.1 python-debugsource(x86-64) = 2.7.18-33.38.1
+[  105s] Requires(rpmlib): rpmlib(PayloadFilesHavePrefix) <= 4.0-1 rpmlib(CompressedFileNames) <= 3.0.4-1
+[  105s] Processing files: python-idle-2.7.18-33.38.1.x86_64
+[  105s] Executing(%doc): /bin/sh -e /var/tmp/rpm-tmp.yI5RZN
