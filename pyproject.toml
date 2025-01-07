@@ -12,6 +12,7 @@ authors = [{name = "mjdonis", email = "marina.donis@suse.com"}]
 maintainers = [{name = "mjdonis", email = "marina.donis@suse.com"}]
 description = "UV openQA helper script created to help/automate the searching phase inside openQA for a given MU"
 readme = {file="README.md", content-type="text/markdown"}
+dependencies = ["requests"]
 
 [project.scripts]
 oqa-search = "oqa_search.oqa_search:main"
