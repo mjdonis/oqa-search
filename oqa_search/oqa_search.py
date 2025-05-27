@@ -21,6 +21,7 @@ INCIDENT_GROUPS: Dict[str, int] = {
     "15-SP4": 439,
     "15-SP5": 490,
     "15-SP6": 546,
+    "15-SP7": 644,
     "12-SP3": 106,
     "12-SP5": 282,
     "15-SP4-TERADATA": 521,
