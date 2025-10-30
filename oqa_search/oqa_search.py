@@ -27,7 +27,7 @@ INCIDENT_GROUPS: Dict[str, int] = {
     "12-SP3-TERADATA": 106,
 }
 
-AGGREGATED_GROUPS: Dict[str, int] = {"core": 414, "containers": 417, "yast": 421, "security": 429}
+AGGREGATED_GROUPS: Dict[str, int] = {"core": 414, "containers": 417, "yast": 421, "security": 429, "cloud": 427}
 
 OQA_QUERY_STRINGS: Dict[str, str] = {
     "failed": "&result=failed&result=incomplete&result=timeout_exceeded",
