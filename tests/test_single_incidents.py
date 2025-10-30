@@ -2,7 +2,7 @@ import mock
 import pytest
 
 from oqa_search import oqa_search
-from tests.conftest import MOCK_URL
+from tests.conftest import MOCK_INCIDENT_GROUPS, MOCK_URL
 
 
 @pytest.mark.parametrize(
@@ -13,11 +13,13 @@ from tests.conftest import MOCK_URL
     ],
 )
 @mock.patch("oqa_search.oqa_search._print_openqa_job_results")
-def test_single_incidents(mock_print_openqa_job_results, versions):
+@mock.patch("oqa_search.oqa_search.get_incident_groups")
+def test_single_incidents(mock_get_incident_groups, mock_print_openqa_job_results, versions):
     build = ":12345:foo"
+    mock_get_incident_groups.return_value = MOCK_INCIDENT_GROUPS
     oqa_search.single_incidents(build, versions, MOCK_URL)
 
-    expected_calls = [mock.call(MOCK_URL, v, build, oqa_search.INCIDENT_GROUPS[v]) for v in versions]
+    expected_calls = [mock.call(MOCK_URL, v, build, MOCK_INCIDENT_GROUPS[v]) for v in versions]
 
     assert mock_print_openqa_job_results.call_count == len(versions)
     mock_print_openqa_job_results.assert_has_calls(expected_calls)
