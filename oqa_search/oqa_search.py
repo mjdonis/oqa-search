@@ -22,10 +22,9 @@ INCIDENT_GROUPS: Dict[str, int] = {
     "15-SP5": 490,
     "15-SP6": 546,
     "15-SP7": 644,
-    "12-SP3": 106,
     "12-SP5": 282,
     "15-SP4-TERADATA": 521,
-    "12-SP3-TERADATA": 191,
+    "12-SP3-TERADATA": 106,
 }
 
 AGGREGATED_GROUPS: Dict[str, int] = {"core": 414, "containers": 417, "yast": 421, "security": 429}
