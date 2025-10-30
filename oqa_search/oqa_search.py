@@ -294,12 +294,15 @@ def _print_openqa_job_results(url_openqa: str, version: str, build: str, group_i
     :param build: build name
     :param group_id: group ID
     """
+    # workaround for error with 12-SP3-TERADATA openqa job url
+    version_oqa = "12-SP3" if version == "12-SP3-TERADATA" else version
+
     # print version and oQA build url
-    print("{} -> {}".format(version, _get_openqa_print_url(url_openqa, version, build, group_id)))
+    print("{} -> {}".format(version, _get_openqa_print_url(url_openqa, version_oqa, build, group_id)))
 
     # query oQA build for any failed or running/scheduled jobs
-    running_url = _get_openqa_build_url("running", url_openqa, version, build, group_id)
-    failed_url = _get_openqa_build_url("failed", url_openqa, version, build, group_id)
+    running_url = _get_openqa_build_url("running", url_openqa, version_oqa, build, group_id)
+    failed_url = _get_openqa_build_url("failed", url_openqa, version_oqa, build, group_id)
 
     running_results = _get_json(running_url)
     failed_results = _get_json(failed_url)
