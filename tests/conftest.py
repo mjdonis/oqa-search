@@ -1,10 +1,8 @@
-import re
 from glob import iglob
 from typing import Dict, List, Optional
 
-from oqa_search import oqa_search
-
 MOCK_URL = "https://fake.test.url"
+MOCK_LOGS_DIR = "tests/fixtures"
 
 
 def mock_incident_settings_json(
@@ -48,26 +46,29 @@ def mock_build_checks_index(package: str) -> str:
     return open(path, "r").read()
 
 
-def get_expected_log_matches(log_text: str) -> List[List[str]]:
-    all_matches = []
-    for regex in oqa_search.TESTSUITE_REGEX_PATTERNS:
-        matches = re.findall(regex, log_text, re.MULTILINE)
-        if matches:
-            all_matches.append(matches)
+def _get_mock_log_files(package: str, pattern: str) -> List[str]:
+    logs_dir = "{}/{}".format(MOCK_LOGS_DIR, package)
+    paths = list(iglob(pattern.format(logs_dir)))
+    paths.sort()
 
-    return all_matches
+    return paths
 
 
 def get_mock_log_filenames(package: str) -> List[str]:
-    logs_dir = "tests/fixtures/{}".format(package)
-    paths = iglob("{}/*.log".format(logs_dir))
+    paths = _get_mock_log_files(package, "{}/*.log")
 
     return [path.split("/")[-1] for path in paths]
 
 
 def mock_log_text(package: str) -> List[str]:
-    logs_dir = "tests/fixtures/{}".format(package)
-    paths = iglob("{}/*.log".format(logs_dir))
+    paths = _get_mock_log_files(package, "{}/*.log")
     logs_text = [open(path, "r").read() for path in paths]
+
+    return logs_text
+
+
+def get_expected_log_matches(package: str) -> List[List[str]]:
+    paths = _get_mock_log_files(package, "{}/*.matches")
+    logs_text = [open(path, "r").read().splitlines() for path in paths]
 
     return logs_text

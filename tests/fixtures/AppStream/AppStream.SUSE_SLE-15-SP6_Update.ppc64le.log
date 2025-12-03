@@ -1,0 +1,29 @@
+[  179s] Executing(%check): /bin/sh -e /var/tmp/rpm-tmp.G7oOyA
+[  179s] + umask 022
+[  179s] + cd /home/abuild/rpmbuild/BUILD
+[  179s] + cd AppStream-1.0.2
+[  179s] + /usr/bin/meson test -C ppc64le-suse-linux --num-processes 8 --print-errorlogs
+[  180s] ninja: Entering directory `/home/abuild/rpmbuild/BUILD/AppStream-1.0.2/ppc64le-suse-linux'
+[  180s] ninja: no work to do.
+[  180s]  1/11 as-validate_metainfo.cli     OK              0.14s
+[  180s]  2/11 as-validate_metainfo.compose OK              0.13s
+[  180s]  3/11 as-test_xml                  OK              0.13s
+[  180s]  4/11 as-test_basic                OK              0.17s
+[  180s]  5/11 as-test_validate             OK              0.12s
+[  180s]  6/11 as-test_perf                 OK              0.10s
+[  180s]  7/11 as-test_yaml                 OK              0.15s
+[  180s]  8/11 as-test_misc                 OK              0.06s
+[  180s]  9/11 as-test_qt5                  OK              0.10s
+[  180s] 10/11 as-test_compose              OK              0.26s
+[  205s] 11/11 as-test_pool                 OK             25.01s
+[  205s]
+[  205s] Ok:                 11
+[  205s] Expected Fail:      0
+[  205s] Fail:               0
+[  205s] Unexpected Pass:    0
+[  205s] Skipped:            0
+[  205s]
+[  205s] Full log written to /home/abuild/rpmbuild/BUILD/AppStream-1.0.2/ppc64le-suse-linux/meson-logs/testlog.txt
+[  205s] + exit 0
+[  205s] Processing files: AppStream-1.0.2-150600.3.5.1.ppc64le
+[  205s] Executing(%doc): /bin/sh -e /var/tmp/rpm-tmp.eWg36H

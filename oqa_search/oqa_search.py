@@ -35,17 +35,45 @@ OQA_QUERY_STRINGS: Dict[str, str] = {
     "all": "",
 }
 
+TESTSUITE_NUMBERS_PATTERN = re.compile(r"(?:^|\s|\()\d+(?=$|\s|\))")
 
-TESTSUITE_REGEX_PATTERNS: List[str] = [
-    "^.*] # [A-Z]+: [ 0-9]+.*$",
-    "^.*] [=Tests ]*[Rr]esult: [A-Za-z]+.*$",
-    "^.*[0-9]+ examples, [0-9]+ failures.*",
-    "^.*] [A-Za-z#: ]*All [0-9 ]*tests [A-Za-z]+.*$",
-    "^.*[0-9][%]? [tests ]*passed[,| in].*$",
-    "^.*] [0-9]+ tests OK[.].*$",
-    "^.*] Tests [a-z ]+: [ 0-9]+.*$",
-    "^.*] [ ]*[Ok Passed Expectedly Failed]+[ ]*: [ 0-9]+.*$",
-    "^.*] [ ]*OK[ ]*[(][ 0-9A-Za-z]+[)].*$",
+
+TESTSUITE_WORDS = [
+    "ok",
+    "passed",
+    "pass",
+    "failed",
+    "fail",
+    "failures",
+    "failed",
+    "skip",
+    "xfail",
+    "error",
+    "errors",
+    "test",
+    "tests",
+    "example",
+    "result",
+    "summary",
+    "total",
+    "success",
+]
+
+TESTSUITE_WORDS_BLOCKLIST = [
+    "syntax",
+    "--",
+    "meson",
+    "gcc",
+    "clang",
+    "make",
+    "cmake",
+    "/usr/bin",
+    ".tap",
+    ".sh",
+    "t/",
+    "TODO",
+    " - ",
+    "duration",
 ]
 
 LOGFILE_REGEX_PATTERN: str = "[A-Za-z-0-9]*[.]SUSE_SLE-[0-9]+[-SP0-9]*_Update[%3A-Za-z_-]*[.][a-z_0-9]+[.]log"
@@ -227,6 +255,30 @@ def _get_group_id(key: str) -> int:
             ) from e
 
 
+def extract_test_results(log_text: str) -> List[str]:
+    """
+    Extract test results from build check logs
+    Only include lines that have standalone numbers and test related keywords while
+    excluding blocked words
+
+    :param log_text: log text content to search through
+    :return: list of matched lines containing test results
+    """
+    matches = []
+    for line in log_text.splitlines():
+        # remove timestamp
+        lower = line.lower().split("]")[1]
+        # skip if it has no standalone numbers
+        if not TESTSUITE_NUMBERS_PATTERN.search(lower):
+            continue
+        if any(blocked_word in lower for blocked_word in TESTSUITE_WORDS_BLOCKLIST):
+            continue
+        if any(word in lower for word in TESTSUITE_WORDS):
+            matches.append(line)
+
+    return matches
+
+
 def _get_openqa_print_url(url_openqa: str, version: str, build: str, group_id: int) -> str:
     """
     Get printable openQA url (not the API endpoint)
@@ -400,10 +452,8 @@ def build_checks(incident_id: int, request_id: int, build: str, url_qam: str) ->
             print(log_url)
 
             # check for testsuite results
-            for regex in TESTSUITE_REGEX_PATTERNS:
-                matches = re.findall(regex, log_text, re.MULTILINE)
-                if matches:
-                    print("\n".join(matches), "\n")
+            matches = extract_test_results(log_text)
+            print("\n".join(matches), "\n")
     else:
         print("No build checks for this incident")
 
