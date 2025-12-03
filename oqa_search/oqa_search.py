@@ -35,64 +35,48 @@ OQA_QUERY_STRINGS: Dict[str, str] = {
     "all": "",
 }
 
+TESTSUITE_NUMBERS_PATTERN = re.compile(r"(?:^|\s|\()\d+(?=$|\s|\))")
 
-TESTSUITE_REGEX_PATTERNS: List[str] = [
-    "^.*] # [A-Z]+: [ 0-9]+.*$",
-    "^.*] [=Tests ]*[Rr]esult: [A-Za-z]+.*$",
-    "^.*[0-9]+ examples, [0-9]+ failures.*",
-    "^.*] [A-Za-z#: ]*All [0-9 ]*tests [A-Za-z]+.*$",
-    "^.*[0-9][%]? [tests ]*passed[,| in].*$",
-    "^.*] [0-9]+ tests OK[.].*$",
-    "^.*] Tests [a-z ]+: [ 0-9]+.*$",
-    "^.*] [ ]*[Ok Passed Expectedly Failed]+[ ]*: [ 0-9]+.*$",
-    "^.*] [ ]*OK[ ]*[(][ 0-9A-Za-z]+[)].*$",
+
+TESTSUITE_WORDS = [
+    "ok",
+    "passed",
+    "pass",
+    "failed",
+    "fail",
+    "failures",
+    "failed",
+    "skip",
+    "xfail",
+    "error",
+    "errors",
+    "test",
+    "tests",
+    "example",
+    "result",
+    "summary",
+    "total",
+    "success",
+]
+
+TESTSUITE_WORDS_BLOCKLIST = [
+    "syntax",
+    "--",
+    "meson",
+    "gcc",
+    "clang",
+    "make",
+    "cmake",
+    "/usr/bin",
+    ".tap",
+    ".sh",
+    "t/",
+    "TODO",
+    " - ",
+    "duration",
 ]
 
 LOGFILE_REGEX_PATTERN: str = "[A-Za-z-0-9]*[.]SUSE_SLE-[0-9]+[-SP0-9]*_Update[%3A-Za-z_-]*[.][a-z_0-9]+[.]log"
-
-
-def _check_url(url: str) -> str:
-    try:
-        result = urlparse(url)
-        all([result.scheme, result.netloc])
-        return url
-    except ValueError:
-        raise argparse.ArgumentError("Not a valid URL")
-
-
-def _parser(args) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description="""For a given update, search inside the Single Incidents - Core Incidents and Aggregated updates
-        job groups for openQA builds related to the update.  It searches by default within the last 5 days in the
-        "Aggregated updates" section.""",
-    )
-    parser.add_argument(
-        "update_id", type=str, help="Update ID, format SUSE:Maintenance:xxxxx:xxxxxx or S:M:xxxxx:xxxxxx"
-    )
-    parser.add_argument("--url-dashboard-qam", type=_check_url, default=DEFAULT_DASHBOARD_URL, help="QAM dashboard URL")
-    parser.add_argument("--url-openqa", type=_check_url, default=DEFAULT_OPENQA_URL, help="OpenQA URL")
-    parser.add_argument("--url-qam", type=_check_url, default=DEFAULT_QAM_URL, help="QAM URL")
-    parser.add_argument(
-        "--no-aggregated", action="store_true", help="Don't search for jobs in the Aggregated Updates section"
-    )
-    parser.add_argument(
-        "--days",
-        type=int,
-        default=5,
-        choices=range(1, 31),
-        help="How many days to search back for in the Aggregated Updates section",
-    )
-    parser.add_argument(
-        "--aggregated-groups",
-        type=str,
-        default=["core"],
-        choices=AGGREGATED_GROUPS.keys(),
-        nargs="+",
-        help="Job groups to look into inside the Aggregated Updates section",
-    )
-
-    return parser.parse_args(args)
 
 
 def print_ok(text: str) -> None:
@@ -131,6 +115,15 @@ def print_title(text: str) -> None:
     print("\033[01;36m{}\033[0m".format(text))
 
 
+def _check_url(url: str) -> str:
+    try:
+        result = urlparse(url)
+        all([result.scheme, result.netloc])
+        return url
+    except ValueError:
+        raise argparse.ArgumentError("Not a valid URL")
+
+
 def _get_json(url: str) -> List[Dict]:
     """
     Fetch json data from a given url
@@ -155,6 +148,41 @@ def _get_log_text(url: str) -> str:
     response.raise_for_status()
 
     return response.text
+
+
+def _parser(args) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="""For a given update, search inside the Single Incidents - Core Incidents and Aggregated updates
+        job groups for openQA builds related to the update.  It searches by default within the last 5 days in the
+        "Aggregated updates" section.""",
+    )
+    parser.add_argument(
+        "update_id", type=str, help="Update ID, format SUSE:Maintenance:xxxxx:xxxxxx or S:M:xxxxx:xxxxxx"
+    )
+    parser.add_argument("--url-dashboard-qam", type=_check_url, default=DEFAULT_DASHBOARD_URL, help="QAM dashboard URL")
+    parser.add_argument("--url-openqa", type=_check_url, default=DEFAULT_OPENQA_URL, help="OpenQA URL")
+    parser.add_argument("--url-qam", type=_check_url, default=DEFAULT_QAM_URL, help="QAM URL")
+    parser.add_argument(
+        "--no-aggregated", action="store_true", help="Don't search for jobs in the Aggregated Updates section"
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=5,
+        choices=range(1, 31),
+        help="How many days to search back for in the Aggregated Updates section",
+    )
+    parser.add_argument(
+        "--aggregated-groups",
+        type=str,
+        default=["core"],
+        choices=AGGREGATED_GROUPS.keys(),
+        nargs="+",
+        help="Job groups to look into inside the Aggregated Updates section",
+    )
+
+    return parser.parse_args(args)
 
 
 def _parse_update_id(update_id: str) -> Tuple[int, int]:
@@ -225,6 +253,30 @@ def _get_group_id(key: str) -> int:
             raise ValueError(
                 "Not a valid version (single incident) or group (aggregated updates): {}".format(key)
             ) from e
+
+
+def extract_test_results(log_text: str) -> List[str]:
+    """
+    Extract test results from build check logs
+    Only include lines that have standalone numbers and test related keywords while
+    excluding blocked words
+
+    :param log_text: log text content to search through
+    :return: list of matched lines containing test results
+    """
+    matches = []
+    for line in log_text.splitlines():
+        # remove timestamp
+        lower = line.lower().split("]")[1]
+        # skip if it has no standalone numbers
+        if not TESTSUITE_NUMBERS_PATTERN.search(lower):
+            continue
+        if any(blocked_word in lower for blocked_word in TESTSUITE_WORDS_BLOCKLIST):
+            continue
+        if any(word in lower for word in TESTSUITE_WORDS):
+            matches.append(line)
+
+    return matches
 
 
 def _get_openqa_print_url(url_openqa: str, version: str, build: str, group_id: int) -> str:
@@ -400,17 +452,13 @@ def build_checks(incident_id: int, request_id: int, build: str, url_qam: str) ->
             print(log_url)
 
             # check for testsuite results
-            for regex in TESTSUITE_REGEX_PATTERNS:
-                matches = re.findall(regex, log_text, re.MULTILINE)
-                if matches:
-                    print("\n".join(matches), "\n")
+            matches = extract_test_results(log_text)
+            print("\n".join(matches), "\n")
     else:
         print("No build checks for this incident")
 
 
 def main():
-    # parser = _parser()
-    # args = parser.parse_args()
     args = _parser(argv[1:])
 
     # get RR and II
