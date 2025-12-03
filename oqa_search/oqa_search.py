@@ -79,50 +79,6 @@ TESTSUITE_WORDS_BLOCKLIST = [
 LOGFILE_REGEX_PATTERN: str = "[A-Za-z-0-9]*[.]SUSE_SLE-[0-9]+[-SP0-9]*_Update[%3A-Za-z_-]*[.][a-z_0-9]+[.]log"
 
 
-def _check_url(url: str) -> str:
-    try:
-        result = urlparse(url)
-        all([result.scheme, result.netloc])
-        return url
-    except ValueError:
-        raise argparse.ArgumentError("Not a valid URL")
-
-
-def _parser(args) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description="""For a given update, search inside the Single Incidents - Core Incidents and Aggregated updates
-        job groups for openQA builds related to the update.  It searches by default within the last 5 days in the
-        "Aggregated updates" section.""",
-    )
-    parser.add_argument(
-        "update_id", type=str, help="Update ID, format SUSE:Maintenance:xxxxx:xxxxxx or S:M:xxxxx:xxxxxx"
-    )
-    parser.add_argument("--url-dashboard-qam", type=_check_url, default=DEFAULT_DASHBOARD_URL, help="QAM dashboard URL")
-    parser.add_argument("--url-openqa", type=_check_url, default=DEFAULT_OPENQA_URL, help="OpenQA URL")
-    parser.add_argument("--url-qam", type=_check_url, default=DEFAULT_QAM_URL, help="QAM URL")
-    parser.add_argument(
-        "--no-aggregated", action="store_true", help="Don't search for jobs in the Aggregated Updates section"
-    )
-    parser.add_argument(
-        "--days",
-        type=int,
-        default=5,
-        choices=range(1, 31),
-        help="How many days to search back for in the Aggregated Updates section",
-    )
-    parser.add_argument(
-        "--aggregated-groups",
-        type=str,
-        default=["core"],
-        choices=AGGREGATED_GROUPS.keys(),
-        nargs="+",
-        help="Job groups to look into inside the Aggregated Updates section",
-    )
-
-    return parser.parse_args(args)
-
-
 def print_ok(text: str) -> None:
     """
     Print text in green using ANSI escape sequences
@@ -159,6 +115,15 @@ def print_title(text: str) -> None:
     print("\033[01;36m{}\033[0m".format(text))
 
 
+def _check_url(url: str) -> str:
+    try:
+        result = urlparse(url)
+        all([result.scheme, result.netloc])
+        return url
+    except ValueError:
+        raise argparse.ArgumentError("Not a valid URL")
+
+
 def _get_json(url: str) -> List[Dict]:
     """
     Fetch json data from a given url
@@ -183,6 +148,41 @@ def _get_log_text(url: str) -> str:
     response.raise_for_status()
 
     return response.text
+
+
+def _parser(args) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="""For a given update, search inside the Single Incidents - Core Incidents and Aggregated updates
+        job groups for openQA builds related to the update.  It searches by default within the last 5 days in the
+        "Aggregated updates" section.""",
+    )
+    parser.add_argument(
+        "update_id", type=str, help="Update ID, format SUSE:Maintenance:xxxxx:xxxxxx or S:M:xxxxx:xxxxxx"
+    )
+    parser.add_argument("--url-dashboard-qam", type=_check_url, default=DEFAULT_DASHBOARD_URL, help="QAM dashboard URL")
+    parser.add_argument("--url-openqa", type=_check_url, default=DEFAULT_OPENQA_URL, help="OpenQA URL")
+    parser.add_argument("--url-qam", type=_check_url, default=DEFAULT_QAM_URL, help="QAM URL")
+    parser.add_argument(
+        "--no-aggregated", action="store_true", help="Don't search for jobs in the Aggregated Updates section"
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=5,
+        choices=range(1, 31),
+        help="How many days to search back for in the Aggregated Updates section",
+    )
+    parser.add_argument(
+        "--aggregated-groups",
+        type=str,
+        default=["core"],
+        choices=AGGREGATED_GROUPS.keys(),
+        nargs="+",
+        help="Job groups to look into inside the Aggregated Updates section",
+    )
+
+    return parser.parse_args(args)
 
 
 def _parse_update_id(update_id: str) -> Tuple[int, int]:
@@ -459,8 +459,6 @@ def build_checks(incident_id: int, request_id: int, build: str, url_qam: str) ->
 
 
 def main():
-    # parser = _parser()
-    # args = parser.parse_args()
     args = _parser(argv[1:])
 
     # get RR and II
