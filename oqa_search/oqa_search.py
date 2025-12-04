@@ -3,8 +3,9 @@
 import argparse
 import re
 from datetime import datetime, timedelta
+from functools import lru_cache
 from sys import argv
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 from urllib.parse import urlparse
 
 import requests
@@ -13,21 +14,11 @@ DEFAULT_DASHBOARD_URL = "http://dashboard.qam.suse.de"
 DEFAULT_OPENQA_URL = "https://openqa.suse.de"
 DEFAULT_QAM_URL = "https://qam.suse.de"
 
+MICRO_TEMPLATE_IDENTIFIER = "sle-micro"
 
-INCIDENT_GROUPS: Dict[str, int] = {
-    "15-SP1": 233,
-    "15-SP2": 306,
-    "15-SP3": 367,
-    "15-SP4": 439,
-    "15-SP5": 490,
-    "15-SP6": 546,
-    "15-SP7": 644,
-    "12-SP5": 282,
-    "15-SP4-TERADATA": 521,
-    "12-SP3-TERADATA": 106,
-}
+EXCLUDED_GROUPS = ("DEV", "Leap", "Development", "Micro", "Kernel", "Wicked")
 
-AGGREGATED_GROUPS: Dict[str, int] = {"core": 414, "containers": 417, "yast": 421, "security": 429, "cloud": 427}
+AGGREGATED_NAME_MAP = {"Public Cloud": "cloud", "SAP/HA": "sap"}
 
 OQA_QUERY_STRINGS: Dict[str, str] = {
     "failed": "&result=failed&result=incomplete&result=timeout_exceeded",
@@ -36,7 +27,6 @@ OQA_QUERY_STRINGS: Dict[str, str] = {
 }
 
 TESTSUITE_NUMBERS_PATTERN = re.compile(r"(?:^|\s|\()\d+(?=$|\s|\))")
-
 
 TESTSUITE_WORDS = [
     "ok",
@@ -79,6 +69,42 @@ TESTSUITE_WORDS_BLOCKLIST = [
 LOGFILE_REGEX_PATTERN: str = "[A-Za-z-0-9]*[.]SUSE_SLE-[0-9]+[-SP0-9]*_Update[%3A-Za-z_-]*[.][a-z_0-9]+[.]log"
 
 
+def _parser(args) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description="""For a given update, search inside the Single Incidents - Core Incidents and Aggregated updates
+        job groups for openQA builds related to the update.  It searches by default within the last 5 days in the
+        "Aggregated updates" section.""",
+    )
+    parser.add_argument(
+        "update_id", type=str, help="Update ID, format SUSE:Maintenance:xxxxx:xxxxxx or S:M:xxxxx:xxxxxx"
+    )
+    parser.add_argument("--url-dashboard-qam", type=_check_url, default=DEFAULT_DASHBOARD_URL, help="QAM dashboard URL")
+    parser.add_argument("--url-openqa", type=_check_url, default=DEFAULT_OPENQA_URL, help="OpenQA URL")
+    parser.add_argument("--url-qam", type=_check_url, default=DEFAULT_QAM_URL, help="QAM URL")
+    parser.add_argument(
+        "--no-aggregated", action="store_true", help="Don't search for jobs in the Aggregated Updates section"
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=5,
+        choices=range(1, 31),
+        help="How many days to search back for in the Aggregated Updates section",
+    )
+    parser.add_argument(
+        "--aggregated-groups",
+        type=str,
+        default=["core"],
+        choices=get_aggregated_groups().keys(),
+        nargs="+",
+        help="Job groups to look into inside the Aggregated Updates section",
+    )
+
+    return parser.parse_args(args)
+
+
+# PRINT UTILITY FUNCTIONS
 def print_ok(text: str) -> None:
     """
     Print text in green using ANSI escape sequences
@@ -115,6 +141,7 @@ def print_title(text: str) -> None:
     print("\033[01;36m{}\033[0m".format(text))
 
 
+# BASIC HELPERS
 def _check_url(url: str) -> str:
     try:
         result = urlparse(url)
@@ -148,41 +175,6 @@ def _get_log_text(url: str) -> str:
     response.raise_for_status()
 
     return response.text
-
-
-def _parser(args) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description="""For a given update, search inside the Single Incidents - Core Incidents and Aggregated updates
-        job groups for openQA builds related to the update.  It searches by default within the last 5 days in the
-        "Aggregated updates" section.""",
-    )
-    parser.add_argument(
-        "update_id", type=str, help="Update ID, format SUSE:Maintenance:xxxxx:xxxxxx or S:M:xxxxx:xxxxxx"
-    )
-    parser.add_argument("--url-dashboard-qam", type=_check_url, default=DEFAULT_DASHBOARD_URL, help="QAM dashboard URL")
-    parser.add_argument("--url-openqa", type=_check_url, default=DEFAULT_OPENQA_URL, help="OpenQA URL")
-    parser.add_argument("--url-qam", type=_check_url, default=DEFAULT_QAM_URL, help="QAM URL")
-    parser.add_argument(
-        "--no-aggregated", action="store_true", help="Don't search for jobs in the Aggregated Updates section"
-    )
-    parser.add_argument(
-        "--days",
-        type=int,
-        default=5,
-        choices=range(1, 31),
-        help="How many days to search back for in the Aggregated Updates section",
-    )
-    parser.add_argument(
-        "--aggregated-groups",
-        type=str,
-        default=["core"],
-        choices=AGGREGATED_GROUPS.keys(),
-        nargs="+",
-        help="Job groups to look into inside the Aggregated Updates section",
-    )
-
-    return parser.parse_args(args)
 
 
 def _parse_update_id(update_id: str) -> Tuple[int, int]:
@@ -235,6 +227,103 @@ def _get_incident_info(url_dashboard_qam: str, incident_id: int) -> Tuple[str, O
         return build, None
 
 
+# OPENQA JOB GROUPS MANAGEMENT FUNCTIONS
+@lru_cache(maxsize=None)  # cache the result
+def _fetch_openqa_groups() -> List[Dict]:
+    """
+    Helper to fetch and cache oQA job groups
+
+    :param match_text: text to match in the group name
+    :param exclude_list: list of words to exclude from the group name
+
+    :return: dict of oQA job groups (name and IDs)
+    """
+    return _get_json(DEFAULT_OPENQA_URL + "/api/v1/job_groups")  # returns cached value for all subsequent calls
+
+
+def _is_valid_template(group: Dict) -> bool:
+    """Check if group has a template and it's not for micro"""
+    template = group["template"]
+    return bool(template and MICRO_TEMPLATE_IDENTIFIER not in template)
+
+
+def _is_name_matching(group: Dict, match_text: str, excluded_terms: Tuple[str, ...]) -> bool:
+    """Check if group name matches criteria"""
+    group_name = group["name"]
+    return bool(match_text in group_name and not any(_ in group_name for _ in excluded_terms))
+
+
+def _extract_version(name: str) -> str:
+    """
+    Extract SLE version from oQA job group names
+
+    :param name: oQA job group name containing version
+    :return: formatted version string like "12-SP5" or "12-SP3-TERADATA"
+    """
+    # space separated format (e.g. 12 SP5)
+    match = re.search(r"(\d+)\s*SP\s*(\d+)(?:\s+TERADATA)?", name)
+    if match:
+        base_version = f"{match.group(1)}-SP{match.group(2)}"
+        return f"{base_version}-TERADATA" if "TERADATA" in name else base_version
+
+    # if no match, use hyphen format (e.g. 12-SP3-TERADATA)
+    match = re.search(r"(\d+)-SP\d+(?:-TERADATA)?", name)
+    if match:
+        # return the full match (already meets the format)
+        return match.group(0)
+
+    return ""
+
+
+def _extract_aggregated_name(name: str) -> str:
+    for k, v in AGGREGATED_NAME_MAP.items():
+        if k in name:
+            return v
+    return name.split()[0].lower()
+
+
+def _filter_openqa_groups(
+    match_text: str,
+    excluded_terms: Tuple[str, ...],
+    name_extractor: Callable,
+) -> Dict[str, int]:
+    """
+    Filter and transform OpenQA groups based on specified criteria.
+
+    Args:
+        match_text: Text to match in group names
+        excluded_terms: Terms to exclude from group names
+        name_extractor: Function to extract key from group name
+
+    Returns:
+        Dictionary mapping extracted names to group IDs
+    """
+    return {
+        name_extractor(group["name"]): group["id"]
+        for group in _fetch_openqa_groups()
+        if _is_name_matching(group, match_text, excluded_terms) and _is_valid_template(group)
+    }
+
+
+def get_incident_groups():
+    """
+    Fetch oQA single incidents job group IDs
+
+    :return: dict of oQA single incidents job group IDs keyed by SLE version
+    """
+    return _filter_openqa_groups("Core Incidents", ("DEV", "Leap"), _extract_version)
+
+
+def get_aggregated_groups():
+    """
+    Fetch aggregated updates job group IDs
+
+    :return: dict of oQA aggregated updates job group IDs keyed by SLE version
+    """
+    return _filter_openqa_groups("Maintenance Updates", ("DEV", "Development", "Micro"), _extract_aggregated_name)
+
+
+# OPENQA JOB MANAGEMENT FUNCTIONS
 def _get_group_id(key: str) -> int:
     """
     Get the group ID for a given key
@@ -244,39 +333,36 @@ def _get_group_id(key: str) -> int:
     """
     try:
         # single incidents
-        return INCIDENT_GROUPS[key]
+        return get_incident_groups()[key]
     except KeyError:
         try:
             # aggregated updates
-            return AGGREGATED_GROUPS[key]
+            return get_aggregated_groups()[key]
         except KeyError as e:
             raise ValueError(
                 "Not a valid version (single incident) or group (aggregated updates): {}".format(key)
             ) from e
 
 
-def extract_test_results(log_text: str) -> List[str]:
+def _get_openqa_job_issues(url_openqa: str, job_id: int) -> Set[int]:
     """
-    Extract test results from build check logs
-    Only include lines that have standalone numbers and test related keywords while
-    excluding blocked words
+    Get all the test issues that are being tested in an openQA job
 
-    :param log_text: log text content to search through
-    :return: list of matched lines containing test results
+    :param url_openqa: openQA URL
+    :param job_id: openQA job ID
+    :return: set of issues tested in the openQA job
     """
-    matches = []
-    for line in log_text.splitlines():
-        # remove timestamp
-        lower = line.lower().split("]")[1]
-        # skip if it has no standalone numbers
-        if not TESTSUITE_NUMBERS_PATTERN.search(lower):
-            continue
-        if any(blocked_word in lower for blocked_word in TESTSUITE_WORDS_BLOCKLIST):
-            continue
-        if any(word in lower for word in TESTSUITE_WORDS):
-            matches.append(line)
+    issues_url = "{}/api/v1/jobs/{}".format(url_openqa, job_id)
+    issues_response = _get_json(issues_url)
 
-    return matches
+    # check if the job is testing the incident for this MU
+    issues = []
+    for k, v in issues_response["job"]["settings"].items():
+        if "_TEST_ISSUES" in k.upper():
+            issues.extend([int(i) for i in v.split(",")])
+
+    # remove duplicates
+    return set(issues)
 
 
 def _get_openqa_print_url(url_openqa: str, version: str, build: str, group_id: int) -> str:
@@ -303,7 +389,7 @@ def _get_openqa_build_url(state: str, url_openqa: str, version: str, build: str,
     :param group_id: group ID
     :return: job URL
     """
-    if group_id not in [*AGGREGATED_GROUPS.values(), *INCIDENT_GROUPS.values()]:
+    if group_id not in [*get_aggregated_groups().values(), *get_incident_groups().values()]:
         raise ValueError("Invalid openQA group ID")
 
     base_url = "{}/api/v1/jobs/overview?distri=sle&version={}&build={}&groupid={}".format(
@@ -314,27 +400,6 @@ def _get_openqa_build_url(state: str, url_openqa: str, version: str, build: str,
         return base_url + OQA_QUERY_STRINGS[state]
     except KeyError as e:
         raise ValueError("Invalid openQA job state") from e
-
-
-def _get_openqa_job_issues(url_openqa: str, job_id: int) -> Set[int]:
-    """
-    Get all the test issues that are being tested in an openQA job
-
-    :param url_openqa: openQA URL
-    :param job_id: openQA job ID
-    :return: set of issues tested in the openQA job
-    """
-    issues_url = "{}/api/v1/jobs/{}".format(url_openqa, job_id)
-    issues_response = _get_json(issues_url)
-
-    # check if the job is testing the incident for this MU
-    issues = []
-    for k, v in issues_response["job"]["settings"].items():
-        if "_TEST_ISSUES" in k.upper():
-            issues.extend([int(i) for i in v.split(",")])
-
-    # remove duplicates
-    return set(issues)
 
 
 def _print_openqa_job_results(url_openqa: str, version: str, build: str, group_id: int) -> None:
@@ -368,6 +433,32 @@ def _print_openqa_job_results(url_openqa: str, version: str, build: str, group_i
         print_ok("PASSED")
 
 
+# BUILD CHECKS FUNCTIONS
+def extract_test_results(log_text: str) -> List[str]:
+    """
+    Extract test results from build check logs
+    Only include lines that have standalone numbers and test related keywords while
+    excluding blocked words
+
+    :param log_text: log text content to search through
+    :return: list of matched lines containing test results
+    """
+    matches = []
+    for line in log_text.splitlines():
+        # remove timestamp
+        lower = line.lower().split("]")[1]
+        # skip if it has no standalone numbers
+        if not TESTSUITE_NUMBERS_PATTERN.search(lower):
+            continue
+        if any(blocked_word in lower for blocked_word in TESTSUITE_WORDS_BLOCKLIST):
+            continue
+        if any(word in lower for word in TESTSUITE_WORDS):
+            matches.append(line)
+
+    return matches
+
+
+# MAIN FEATURE FUNCTIONS
 def single_incidents(build: str, versions: List[str], url_openqa: str) -> None:
     """
     Print the openQA job results under the Single Incidents - Core Incidents section for an update

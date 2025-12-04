@@ -2,7 +2,24 @@ from glob import iglob
 from typing import Dict, List, Optional
 
 MOCK_URL = "https://fake.test.url"
+
 MOCK_LOGS_DIR = "tests/fixtures"
+
+MOCK_INCIDENT_GROUPS = {
+    "15-SP1": 233,
+    "15-SP2": 306,
+    "15-SP3": 367,
+    "15-SP4": 439,
+    "15-SP5": 490,
+    "15-SP6": 546,
+    "15-SP7": 644,
+    "12-SP3": 106,
+    "12-SP5": 282,
+    "15-SP4-TERADATA": 521,
+    "12-SP3-TERADATA": 106,
+}
+
+MOCK_AGGREGATED_GROUPS = {"core": 414, "containers": 417, "yast": 421, "security": 429, "cloud": 427}
 
 
 def mock_incident_settings_json(
@@ -38,6 +55,10 @@ def mock_openqa_job_json(issues: str, **kwargs) -> Dict[str, Dict]:
 
 def mock_openqa_job_results(jobs: int) -> List[Dict[str, str]]:
     return [{"id": i, "name": "somejob-{}".format(i)} for i in range(jobs)]
+
+
+def mock_openqa_job_group(id: int = 123, name: str = "somename", template: str = "sometemplate"):
+    return {"id": id, "name": name, "template": template}
 
 
 def mock_build_checks_index(package: str) -> str:

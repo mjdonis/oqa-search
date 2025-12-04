@@ -4,7 +4,7 @@ import mock
 import pytest
 
 from oqa_search import oqa_search
-from tests.conftest import MOCK_URL, mock_openqa_job_results
+from tests.conftest import MOCK_AGGREGATED_GROUPS, MOCK_URL, mock_openqa_job_results
 
 
 @pytest.mark.parametrize(
@@ -18,7 +18,9 @@ from tests.conftest import MOCK_URL, mock_openqa_job_results
 @mock.patch("oqa_search.oqa_search._print_openqa_job_results")
 @mock.patch("oqa_search.oqa_search._get_openqa_job_issues")
 @mock.patch("oqa_search.oqa_search._get_json")
+@mock.patch("oqa_search.oqa_search.get_aggregated_groups")
 def test_aggregated_updates(
+    mock_get_aggregated_groups,
     mock_get_json,
     mock_get_openqa_job_issues,
     mock_print_openqa_job_results,
@@ -34,6 +36,7 @@ def test_aggregated_updates(
             mock_issues.append([i])
         mock_issues.append([12345])
     mock_get_openqa_job_issues.side_effect = mock_issues
+    mock_get_aggregated_groups.return_value = MOCK_AGGREGATED_GROUPS
 
     oqa_search.aggregated_updates(12345, versions, days, aggregated_groups, MOCK_URL)
 
@@ -42,7 +45,7 @@ def test_aggregated_updates(
             MOCK_URL,
             version,
             "{}-1".format((datetime.now() - timedelta(days - 1)).strftime("%Y%m%d")),
-            oqa_search.AGGREGATED_GROUPS[group],
+            MOCK_AGGREGATED_GROUPS[group],
         )
         for version in actual_versions
         for group in aggregated_groups
@@ -62,7 +65,9 @@ def test_aggregated_updates_teradata_versions_only(mock_print_openqa_job_results
 @mock.patch("oqa_search.oqa_search._print_openqa_job_results")
 @mock.patch("oqa_search.oqa_search._get_openqa_job_issues")
 @mock.patch("oqa_search.oqa_search._get_json")
+@mock.patch("oqa_search.oqa_search.get_aggregated_groups")
 def test_aggregated_updates_no_builds(
+    mock_get_aggregated_groups,
     mock_get_json,
     mock_get_openqa_job_issues,
     mock_print_openqa_job_results,
@@ -70,6 +75,7 @@ def test_aggregated_updates_no_builds(
 ):
     mock_get_json.return_value = mock_openqa_job_results(1)
     mock_get_openqa_job_issues.side_effect = [[i] for i in range(5)]
+    mock_get_aggregated_groups.return_value = MOCK_AGGREGATED_GROUPS
     oqa_search.aggregated_updates(12345, ["15-SP4"], 5, ["core"], MOCK_URL)
 
     mock_print_openqa_job_results.assert_not_called()
