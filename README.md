@@ -4,6 +4,7 @@ to test. The script searches inside all the openQA job groups related with a giv
 generates an output suitable to add (copy/paste) inside the update log.
 
 [Hackweek 2024 project](https://hackweek.opensuse.org/24/projects/enhance-uv-openqa-helper-script)
+[Hackweek 2025 project](https://hackweek.opensuse.org/projects/work-on-enhancements-for-oqa-search)
 
 ## Usage
 The main script can be run on its own. Alternatively, if this package is installed a command for it will also be 
