@@ -16,9 +16,15 @@ DEFAULT_QAM_URL = "https://qam.suse.de"
 
 MICRO_TEMPLATE_IDENTIFIER = "sle-micro"
 
-EXCLUDED_GROUPS = ("DEV", "Leap", "Development", "Micro", "Kernel", "Wicked")
+EXCLUDED_GROUPS = ["DEV", "Leap", "Development", "Micro", "Kernel", "Wicked"]
+
+SINGLE_INCIDENTS_TERMS = ["Core Incidents", "Core Staging"]
+
+AGGREGATED_GROUPS_TERMS = ["Maintenance Updates"]
 
 AGGREGATED_NAME_MAP = {"Public Cloud": "cloud", "SAP/HA": "sap"}
+
+AGGREGATED_EXCLUDED_VERSIONS = ["TERADATA", "16.0"]
 
 OQA_QUERY_STRINGS: Dict[str, str] = {
     "failed": "&result=failed&result=incomplete&result=timeout_exceeded",
@@ -177,20 +183,23 @@ def _get_log_text(url: str) -> str:
     return response.text
 
 
-def _parse_update_id(update_id: str) -> Tuple[int, int]:
+def _parse_update_id(update_id: str) -> Tuple[str, Union[int, str], int]:
     """
     Given an update ID, return its incident ID and request ID
 
     :param update_id: update ID
     :return: incident ID and request ID
     """
-    _, _, incident_id, request_id = update_id.split(":")
+    _, product, incident_id, request_id = update_id.split(":")
 
     # check that the ids are numbers
     try:
-        return int(incident_id), int(request_id)
+        return product, int(incident_id), int(request_id)
     except ValueError as e:
-        raise ValueError("Invalid update ID") from e
+        if incident_id == "1.2":  # SLE16
+            return product, incident_id, int(request_id)
+        else:
+            raise ValueError("Invalid update ID") from e
 
 
 def _get_incident_info(url_dashboard_qam: str, incident_id: int) -> Tuple[str, Optional[List[str]]]:
@@ -227,6 +236,20 @@ def _get_incident_info(url_dashboard_qam: str, incident_id: int) -> Tuple[str, O
         return build, None
 
 
+def _get_effective_incident_id(incident_id: Union[int, str], request_id: int) -> Union[int, str]:
+    """
+    Determine which ID to use for incident info lookup.
+
+    For integer incident IDs, use the incident_id directly.
+    For string incident IDs (like SLE16 "1.2"), use the request_id instead.
+
+    :param incident_id: incident ID (int or str)
+    :param request_id: request ID (int)
+    :return: the appropriate ID to use for the incident info lookup
+    """
+    return incident_id if isinstance(incident_id, int) else request_id
+
+
 # OPENQA JOB GROUPS MANAGEMENT FUNCTIONS
 @lru_cache(maxsize=None)  # cache the result
 def _fetch_openqa_groups() -> List[Dict]:
@@ -247,10 +270,10 @@ def _is_valid_template(group: Dict) -> bool:
     return bool(template and MICRO_TEMPLATE_IDENTIFIER not in template)
 
 
-def _is_name_matching(group: Dict, match_text: str, excluded_terms: Tuple[str, ...]) -> bool:
+def _is_name_matching(group: Dict, match_terms: List[str], excluded_terms: List[str]) -> bool:
     """Check if group name matches criteria"""
     group_name = group["name"]
-    return bool(match_text in group_name and not any(_ in group_name for _ in excluded_terms))
+    return bool(any(_ in group_name for _ in match_terms) and not any(_ in group_name for _ in excluded_terms))
 
 
 def _extract_version(name: str) -> str:
@@ -272,6 +295,12 @@ def _extract_version(name: str) -> str:
         # return the full match (already meets the format)
         return match.group(0)
 
+    # if no match, use dot versioning (e.g. 16.0)
+    match = re.search(r"(\d+\.\d+)", name)
+    if match:
+        # return the full match (already meets the format)
+        return match.group(0)
+
     return ""
 
 
@@ -283,8 +312,8 @@ def _extract_aggregated_name(name: str) -> str:
 
 
 def _filter_openqa_groups(
-    match_text: str,
-    excluded_terms: Tuple[str, ...],
+    match_text: List[str],
+    excluded_terms: List[str],
     name_extractor: Callable,
 ) -> Dict[str, int]:
     """
@@ -311,7 +340,7 @@ def get_incident_groups():
 
     :return: dict of oQA single incidents job group IDs keyed by SLE version
     """
-    return _filter_openqa_groups("Core Incidents", ("DEV", "Leap"), _extract_version)
+    return _filter_openqa_groups(SINGLE_INCIDENTS_TERMS, EXCLUDED_GROUPS, _extract_version)
 
 
 def get_aggregated_groups():
@@ -320,7 +349,7 @@ def get_aggregated_groups():
 
     :return: dict of oQA aggregated updates job group IDs keyed by SLE version
     """
-    return _filter_openqa_groups("Maintenance Updates", ("DEV", "Development", "Micro"), _extract_aggregated_name)
+    return _filter_openqa_groups(AGGREGATED_GROUPS_TERMS, EXCLUDED_GROUPS, _extract_aggregated_name)
 
 
 # OPENQA JOB MANAGEMENT FUNCTIONS
@@ -486,9 +515,12 @@ def aggregated_updates(
     :param aggregated_groups: groups under aggregated updates to search for builds in
     :param url_openqa: openQA URL
     """
-    # no teradata builds under aggregated updates
-    versions = [v for v in versions if "TERADATA" not in v]
+    # no teradata or sle16 builds under aggregated updates
+    versions = [v for v in versions if not any(_ in v for _ in AGGREGATED_EXCLUDED_VERSIONS)]
 
+    if not versions:
+        print_warn("No aggregated updates builds available for this incident")
+        return
     for group in aggregated_groups:
         print_title("\nAggregated updates - {}".format(group.title()))
         for version in versions:
@@ -518,7 +550,7 @@ def aggregated_updates(
                 )
 
 
-def build_checks(incident_id: int, request_id: int, build: str, url_qam: str) -> None:
+def build_checks(product: str, incident_id: int, request_id: int, build: str, url_qam: str) -> None:
     """
     Print the link and results of any build checks available for the update
 
@@ -529,7 +561,7 @@ def build_checks(incident_id: int, request_id: int, build: str, url_qam: str) ->
     """
     print_title("\nBuild checks:\n#############")
     package_name = build.split(":")[2]
-    base_url = "{}/testreports/SUSE:Maintenance:{}:{}/build_checks".format(url_qam, incident_id, request_id)
+    base_url = "{}/testreports/SUSE:{}:{}:{}/build_checks".format(url_qam, product, incident_id, request_id)
 
     # check if any build checks were run by looking for logs
     text = _get_log_text(base_url)
@@ -553,10 +585,10 @@ def main():
     args = _parser(argv[1:])
 
     # get RR and II
-    incident_id, request_id = _parse_update_id(args.update_id)
+    product, incident_id, request_id = _parse_update_id(args.update_id)
     print_title("OpenQA:\n#######")
     # get build name and versions
-    build, versions = _get_incident_info(args.url_dashboard_qam, incident_id)
+    build, versions = _get_incident_info(args.url_dashboard_qam, _get_effective_incident_id(incident_id, request_id))
     if versions:
         single_incidents(build, versions, args.url_openqa)
         if not args.no_aggregated:
@@ -566,7 +598,7 @@ def main():
         print_warn("No openQA builds for this incident yet")
 
     print("-------")
-    build_checks(incident_id, request_id, build, args.url_qam)
+    build_checks(product, incident_id, request_id, build, args.url_qam)
 
 
 if __name__ == "__main__":
