@@ -19,9 +19,11 @@ from tests.conftest import (
 @pytest.mark.parametrize(
     ("update_id", "expected_values"),
     [
-        ("SUSE:Maintenance:36413:353665", (36413, 353665)),
-        ("SUSE:Maintenance:36419:353574", (36419, 353574)),
-        ("SUSE:Maintenance:26894:15345", (26894, 15345)),
+        ("SUSE:Maintenance:36413:353665", ("Maintenance", 36413, 353665)),
+        ("SUSE:Maintenance:36419:353574", ("Maintenance", 36419, 353574)),
+        ("SUSE:Maintenance:26894:15345", ("Maintenance", 26894, 15345)),
+        ("SUSE:SLFO:1.2:542", ("SLFO", "1.2", 542)),
+        ("SUSE:SLFO:1.2:215", ("SLFO", "1.2", 215)),
     ],
 )
 def test_parse_update_id(update_id, expected_values):
@@ -31,6 +33,7 @@ def test_parse_update_id(update_id, expected_values):
 
     with pytest.raises(ValueError):
         oqa_search._parse_update_id("SUSE:Maintenance:not:numbers")
+        oqa_search._parse_update_id("SUSE:PI:16.0:1542")
 
 
 @pytest.mark.parametrize(
@@ -63,6 +66,21 @@ def test_get_incident_info(mock_get_json, incident_id, package_name, versions):
 
 
 @pytest.mark.parametrize(
+    ("incident_id", "request_id", "expected_value"),
+    [
+        ("1.2", 1254, 1254),
+        ("1.2", 5468, 5468),
+        (12354, 36419, 12354),
+        (98953, 26894, 98953),
+    ],
+)
+def test_get_effective_incident_id(incident_id, request_id, expected_value):
+    actual_value = oqa_search._get_effective_incident_id(incident_id, request_id)
+
+    assert actual_value == expected_value
+
+
+@pytest.mark.parametrize(
     ("template", "expected_value"), [("sle-micro-2", False), (None, False), ("sle-15", True), ("sometext", True)]
 )
 def test_is_valid_template(template, expected_value):
@@ -82,7 +100,7 @@ def test_is_valid_template(template, expected_value):
 )
 def test_is_name_matching_single_incidents(name, expected_value):
     actual_value = oqa_search._is_name_matching(
-        mock_openqa_job_group(name=name), "Core Incidents", oqa_search.EXCLUDED_GROUPS
+        mock_openqa_job_group(name=name), oqa_search.SINGLE_INCIDENTS_TERMS, oqa_search.EXCLUDED_GROUPS
     )
 
     assert actual_value == expected_value
@@ -99,7 +117,7 @@ def test_is_name_matching_single_incidents(name, expected_value):
 )
 def test_is_name_matching_aggregated_updates(name, expected_value):
     actual_value = oqa_search._is_name_matching(
-        mock_openqa_job_group(name=name), "Maintenance Updates", oqa_search.EXCLUDED_GROUPS
+        mock_openqa_job_group(name=name), oqa_search.AGGREGATED_GROUPS_TERMS, oqa_search.EXCLUDED_GROUPS
     )
 
     assert actual_value == expected_value
@@ -109,7 +127,7 @@ def test_is_name_matching_aggregated_updates(name, expected_value):
     ("match_text", "name_extractor", "bad_groups", "valid_groups", "expected_value"),
     [
         (
-            "Core Incidents",
+            oqa_search.SINGLE_INCIDENTS_TERMS,
             oqa_search._extract_version,
             [
                 mock_openqa_job_group(123, "Whatever Core Incidents", "sle-micro-testing"),
@@ -121,7 +139,7 @@ def test_is_name_matching_aggregated_updates(name, expected_value):
             {"12-SP5": 111},
         ),
         (
-            "Core Incidents",
+            oqa_search.SINGLE_INCIDENTS_TERMS,
             oqa_search._extract_version,
             [
                 mock_openqa_job_group(456, "Foobar Group Core Incidents - DEV"),
@@ -135,7 +153,7 @@ def test_is_name_matching_aggregated_updates(name, expected_value):
             {"15-SP4-TERADATA": 444, "15-SP2": 555},
         ),
         (
-            "Maintenance Updates",
+            oqa_search.AGGREGATED_GROUPS_TERMS,
             oqa_search._extract_aggregated_name,
             [
                 mock_openqa_job_group(789, "Maintenance: SLE 12 SP5 Core Incidents"),
@@ -147,7 +165,7 @@ def test_is_name_matching_aggregated_updates(name, expected_value):
             {"sap": 777},
         ),
         (
-            "Maintenance Updates",
+            oqa_search.AGGREGATED_GROUPS_TERMS,
             oqa_search._extract_aggregated_name,
             [
                 mock_openqa_job_group(123, "FOO Maintenance Updates", template="tests-sle-micro"),

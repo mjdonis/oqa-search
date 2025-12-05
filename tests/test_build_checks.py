@@ -31,10 +31,10 @@ def test_extract_test_results(package):
 
 
 @pytest.mark.parametrize(
-    ("incident_id", "request_id", "package"),
+    ("product", "incident_id", "request_id", "package"),
     [
-        (1234, 56789, "automake"),
-        (9876, 12345, "python"),
+        ("Maintenance", 1234, 56789, "automake"),
+        ("Maintenance", 9876, 12345, "python"),
     ],
 )
 @mock.patch("oqa_search.oqa_search._get_log_text")
@@ -42,13 +42,20 @@ def test_extract_test_results(package):
 @mock.patch("oqa_search.oqa_search.print_title")
 @mock.patch("oqa_search.oqa_search.extract_test_results")
 def test_build_checks(
-    mock_extract_test_results, mock_print_title, mock_print, mock_get_log_text, incident_id, request_id, package
+    mock_extract_test_results,
+    mock_print_title,
+    mock_print,
+    mock_get_log_text,
+    product,
+    incident_id,
+    request_id,
+    package,
 ):
     mock_logs_text = mock_log_text(package)
     mock_get_log_text.side_effect = [mock_build_checks_index(package), *mock_logs_text]
     expected_log_matches = get_expected_log_matches(package)
     mock_extract_test_results.side_effect = expected_log_matches
-    oqa_search.build_checks(incident_id, request_id, ":{}:{}".format(incident_id, package), MOCK_URL)
+    oqa_search.build_checks(product, incident_id, request_id, ":{}:{}".format(incident_id, package), MOCK_URL)
 
     mock_logs = get_mock_log_filenames(package)
     mock_urls = [
