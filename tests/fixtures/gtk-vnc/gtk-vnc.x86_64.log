@@ -1,0 +1,23 @@
+[   32s] Executing(%check): /usr/bin/bash -e /var/tmp/rpm-tmp.SQDZJR
+[   32s] + umask 022
+[   32s] + cd /home/abuild/rpmbuild/BUILD/gtk-vnc-1.5.0-build
+[   32s] + cd gtk-vnc-1.5.0
+[   32s] + /usr/bin/meson test -C x86_64-suse-linux -j4 --print-errorlogs
+[   32s] ninja: Entering directory `/home/abuild/rpmbuild/BUILD/gtk-vnc-1.5.0-build/gtk-vnc-1.5.0/x86_64-suse-linux'
+[   32s] ninja: no work to do.
+[   32s] 1/3 dhtest            OK              0.01s
+[   32s] 2/3 coroutinetest     OK              0.01s
+[   32s] 3/3 vncconnectiontest OK              0.12s
+[   32s]
+[   32s] Ok:                3
+[   32s] Fail:              0
+[   32s]
+[   32s] Full log written to /home/abuild/rpmbuild/BUILD/gtk-vnc-1.5.0-build/gtk-vnc-1.5.0/x86_64-suse-linux/meson-logs/testlog.txt
+[   32s] + RPM_EC=0
+[   32s] ++ jobs -p
+[   32s] + exit 0
+[   32s] Processing files: gtk-vnc-debugsource-1.5.0-999999_stage.1.1.x86_64
+[   32s] Provides: gtk-vnc-debugsource = 1.5.0-999999_stage.1.1 gtk-vnc-debugsource(x86-64) = 1.5.0-999999_stage.1.1
+[   32s] Requires(rpmlib): rpmlib(CompressedFileNames) <= 3.0.4-1 rpmlib(FileDigests) <= 4.6.0-1 rpmlib(PayloadFilesHavePrefix) <= 4.0-1
+[   32s] Processing files: libgvnc-1_0-0-1.5.0-999999_stage.1.1.x86_64
+[   32s] Executing(%license): /usr/bin/bash -e /var/tmp/rpm-tmp.7HNpEa
