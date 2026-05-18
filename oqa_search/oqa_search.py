@@ -35,27 +35,6 @@ OQA_QUERY_STRINGS: Dict[str, str] = {
 
 TESTSUITE_NUMBERS_PATTERN = re.compile(r"(?:^|\s|\()\d+(?=$|\s|\))")
 
-TESTSUITE_WORDS = [
-    "ok",
-    "passed",
-    "pass",
-    "failed",
-    "fail",
-    "failures",
-    "failed",
-    "skip",
-    "xfail",
-    "error",
-    "errors",
-    "test",
-    "tests",
-    "example",
-    "result",
-    "summary",
-    "total",
-    "success",
-]
-
 TESTSUITE_WORDS_BLOCKLIST = [
     "syntax",
     "--",
@@ -73,6 +52,41 @@ TESTSUITE_WORDS_BLOCKLIST = [
     "duration",
     " + ",
     "group",
+    "value",
+    "doc",
+    "stack",
+    "errno",
+    "tests in",
+    "limit",
+    "size",
+    "test for",
+    "creating",
+    "task",
+    "no tests",
+    "thread",
+    "server",
+    "method",
+    "object",
+    "issue",
+    "line",
+    "set",
+    "test_",
+    "example",
+    "flag",
+    "print",
+    "extra",
+]
+
+TESTSUITE_VISUAL_SEPARATORS = ["===", "---"]
+
+TESTSUITE_SUMMARY_KEYWORDS = ["result:", "summary", "out of", "tests passed", "tests failed"]
+
+TESTSUITE_SUMMARY_PATTERNS = [
+    re.compile(r"\bok\s*\("),  # OK(...) (Unity, TAP)
+    re.compile(r"\d+%\s+tests?\s+passed"),  # "100% tests passed" (CTest)
+    re.compile(r"\d+\s+tests?\s+(ok|passed|failed|skipped)"),  # "16 tests OK" (Python unittest)
+    re.compile(r"#\s*(total|pass|fail|skip|xfail|xpass|error):"),  # "# TOTAL:" (Automake TAP)
+    re.compile(r"^(ok|fail|expected fail|unexpected pass|skipped):\s*\d+"),  # "Ok: 11" (GLib)
 ]
 
 
@@ -120,6 +134,11 @@ def _parser(args) -> argparse.Namespace:
         choices=get_aggregated_groups().keys(),
         nargs="+",
         help="Job groups to look into inside the Aggregated Updates section",
+    )
+    parser.add_argument(
+        "--test-pattern",
+        type=str,
+        help="Custom regex pattern to extract test results from build check logs",
     )
 
     return parser.parse_args(args)
@@ -478,28 +497,78 @@ def _print_openqa_job_results(url_openqa: str, version: str, build: str, group_i
 
 
 # BUILD CHECKS FUNCTIONS
-def extract_test_results(log_text: str) -> List[str]:
+def extract_test_results(log_text: str, custom_pattern: Optional[str] = None) -> List[str]:
     """
-    Extract test results from build check logs
-    Only include lines that have standalone numbers and test related keywords while
-    excluding blocked words
+    Extract summary lines from build check logs.
+
+    By default, uses strict heuristics to find summary lines (lines with ===, result:, summary, etc.).
+    If custom_pattern is provided, it overrides the default behavior
 
     :param log_text: log text content to search through
+    :param custom_pattern: optional regex pattern to search for
     :return: list of matched lines containing test results
     """
     matches = []
+
+    if custom_pattern:
+        try:
+            pattern = re.compile(custom_pattern, re.IGNORECASE)
+            for line in log_text.splitlines():
+                if pattern.search(line):
+                    matches.append(line)
+            return matches
+        except re.error as e:
+            print_warn(f"Invalid regex pattern: {e}")
+            return []
+
     for line in log_text.splitlines():
         # remove timestamp
-        lower = line.lower().split("]")[1]
+        clean_line = re.sub(r"^\[\s*\d+s\]\s*", "", line)
+        lower = clean_line.lower().strip()
+
         # skip if it has no standalone numbers
         if not TESTSUITE_NUMBERS_PATTERN.search(lower):
             continue
+
         if any(blocked_word in lower for blocked_word in TESTSUITE_WORDS_BLOCKLIST):
             continue
-        if any(word in lower for word in TESTSUITE_WORDS):
+
+        # check for visual separators (usually present in summary lines)
+        if any(sep in clean_line for sep in TESTSUITE_VISUAL_SEPARATORS):
+            matches.append(line)
+            continue
+
+        if any(keyword in lower for keyword in TESTSUITE_SUMMARY_KEYWORDS):
+            matches.append(line)
+            continue
+
+        if any(pattern.search(lower) for pattern in TESTSUITE_SUMMARY_PATTERNS):
             matches.append(line)
 
     return matches
+
+
+def summarize_test_results(lines: List[str]) -> str:
+    """
+    Given a list of test result lines, return a summary string with the total number of
+    tests passed/failed and how many lines were summarized
+
+    :param lines: list of test result lines
+    :return: summary string
+    """
+    total_passed = 0
+    total_failed = 0
+
+    for line in lines[1:-1]:
+        # extract numbers from "N passed/pass; M failed/fail"
+        passed_match = re.search(r"(\d+) pass(?:ed)?", line, re.IGNORECASE)
+        failed_match = re.search(r"(\d+) fail(?:ed)?", line, re.IGNORECASE)
+        if passed_match:
+            total_passed += int(passed_match.group(1))
+        if failed_match:
+            total_failed += int(failed_match.group(1))
+
+    return f"({len(lines) - 2} more results, {total_passed} passed, {total_failed} failed)"
 
 
 # MAIN FEATURE FUNCTIONS
@@ -565,7 +634,9 @@ def aggregated_updates(
                 )
 
 
-def build_checks(product: str, incident_id: int, request_id: int, build: str, url_qam: str) -> None:
+def build_checks(
+    product: str, incident_id: int, request_id: int, build: str, url_qam: str, test_pattern: Optional[str] = None
+) -> None:
     """
     Print the link and results of any build checks available for the update
 
@@ -574,6 +645,7 @@ def build_checks(product: str, incident_id: int, request_id: int, build: str, ur
     :param request_id: request ID
     :param build: build name
     :param url_qam: qam url
+    :param test_pattern: optional custom regex pattern to extract test results
     """
     print_title("\nBuild checks:\n#############")
     package_name = build.split(":")[-1]
@@ -594,8 +666,17 @@ def build_checks(product: str, incident_id: int, request_id: int, build: str, ur
             print(log_url)
 
             # check for testsuite results
-            matches = extract_test_results(log_text)
-            print("\n".join(matches), "\n")
+            matches = extract_test_results(log_text, test_pattern)
+            if matches:
+                if len(matches) > 4:
+                    # if there are more than 4 lines of matches, show first line and last line, summarize the rest
+                    print(matches[0])
+                    print(summarize_test_results(matches))
+                    print(matches[-1], "\n")
+                else:
+                    print("\n".join(matches), "\n")
+            else:
+                print("No test results found (try using a custom pattern with --test-pattern)\n")
     else:
         print("No build checks for this incident")
 
@@ -617,7 +698,7 @@ def main():
         print_warn("No openQA builds for this incident yet")
 
     print("-------")
-    build_checks(product, incident_id, request_id, build, args.url_qam)
+    build_checks(product, incident_id, request_id, build, args.url_qam, args.test_pattern)
 
 
 if __name__ == "__main__":
