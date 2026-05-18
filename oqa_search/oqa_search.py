@@ -576,7 +576,7 @@ def build_checks(product: str, incident_id: int, request_id: int, build: str, ur
     :param url_qam: qam url
     """
     print_title("\nBuild checks:\n#############")
-    package_name = build.split(":")[2]
+    package_name = build.split(":")[-1]
     base_url = "{}/testreports/SUSE:{}:{}:{}/build_checks".format(url_qam, product, incident_id, request_id)
 
     # parse html index to find log files
