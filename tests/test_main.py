@@ -37,6 +37,7 @@ def test_main(
         no_aggregated=no_aggregated,
         days=5,
         aggregated_groups=["core"],
+        test_pattern=None,
     )
     mock_get_incident_info.return_value = (":12345:foo", versions)
 
