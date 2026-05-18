@@ -4,9 +4,10 @@ import argparse
 import re
 from datetime import datetime, timedelta
 from functools import lru_cache
+from html.parser import HTMLParser
 from sys import argv
 from typing import Callable, Dict, List, Optional, Set, Tuple, Union
-from urllib.parse import urlparse
+from urllib.parse import quote, unquote, urlparse
 
 import requests
 
@@ -74,7 +75,19 @@ TESTSUITE_WORDS_BLOCKLIST = [
     "group",
 ]
 
-LOGFILE_REGEX_PATTERN: str = "[A-Za-z-0-9]*[.]SUSE_SLE-[0-9]+[-SP0-9]*_Update[%3A-Za-z_-]*[.][a-z_0-9]+[.]log"
+
+class LogFileLinkParser(HTMLParser):
+    """Parse HTML to extract .log file links"""
+
+    def __init__(self):
+        super().__init__()
+        self.log_files = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            for attr, value in attrs:
+                if attr == "href" and value.endswith(".log"):
+                    self.log_files.append(unquote(value))
 
 
 def _parser(args) -> argparse.Namespace:
@@ -172,12 +185,12 @@ def _get_json(url: str) -> List[Dict]:
     return response.json()
 
 
-def _get_log_text(url: str) -> str:
+def _fetch_url_content(url: str) -> str:
     """
-    Fetch log text from a given url
+    Fetch text content from a given URL
 
-    :param url: url to fetch log text from
-    :return: log text
+    :param url: URL to fetch content from
+    :return: text content
     """
     response = requests.get(url)
     response.raise_for_status()
@@ -556,6 +569,7 @@ def build_checks(product: str, incident_id: int, request_id: int, build: str, ur
     """
     Print the link and results of any build checks available for the update
 
+    :param product: product name
     :param incident_id: incident ID
     :param request_id: request ID
     :param build: build name
@@ -565,15 +579,18 @@ def build_checks(product: str, incident_id: int, request_id: int, build: str, ur
     package_name = build.split(":")[2]
     base_url = "{}/testreports/SUSE:{}:{}:{}/build_checks".format(url_qam, product, incident_id, request_id)
 
-    # check if any build checks were run by looking for logs
-    text = _get_log_text(base_url)
-    logfiles = set(re.findall("{}{}".format(package_name, LOGFILE_REGEX_PATTERN), text, re.MULTILINE))
+    # parse html index to find log files
+    html_text = _fetch_url_content(base_url)
+    parser = LogFileLinkParser()
+    parser.feed(html_text)
+
+    logfiles = [log for log in parser.log_files if package_name in log and ".log" in log]
 
     if logfiles:
         for log in logfiles:
             # print log url
-            log_url = "{}/{}".format(base_url, log)
-            log_text = _get_log_text(log_url)
+            log_url = "{}/{}".format(base_url, quote(log))
+            log_text = _fetch_url_content(log_url)
             print(log_url)
 
             # check for testsuite results
